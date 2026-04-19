@@ -6,8 +6,12 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 DEVICE = "cpu"
-MODEL_NAME = os.getenv("MODEL_NAME", "all-MiniLM-L6-v2")
+MODEL_NAME = os.getenv("MODEL_NAME", "sentence-transformers/paraphrase-albert-small-v2")
 
 # Batch size for the transformer forward pass.
 # On a dedicated 1GB machine with no other load, 32 is safe and fast.

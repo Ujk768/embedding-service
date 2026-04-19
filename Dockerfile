@@ -17,4 +17,4 @@ COPY --from=builder /root/.cache /root/.cache
 COPY embedding_service.py main.py
 ENV PATH=/root/.local/bin:$PATH
 EXPOSE 7000
-CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "main:app", "--bind", "0.0.0.0:7000", "--timeout", "120"]
+CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "embeddingservice:app", "--bind", "0.0.0.0:7000", "--timeout", "120"]

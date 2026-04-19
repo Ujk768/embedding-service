@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /root/.local /root/.local
 # Copy cached model weights baked into the image
 COPY --from=builder /root/.cache /root/.cache
-COPY embedding_service.py main.py
+COPY embeddingservice.py .
 ENV PATH=/root/.local/bin:$PATH
 EXPOSE 7000
 CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "embeddingservice:app", "--bind", "0.0.0.0:7000", "--timeout", "120"]

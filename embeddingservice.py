@@ -1,36 +1,31 @@
 import os
 from fastapi import FastAPI
 from pydantic import BaseModel
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
-
 from dotenv import load_dotenv
 
 load_dotenv()
 
-DEVICE = "cpu"
-MODEL_NAME = os.getenv("MODEL_NAME", "sentence-transformers/paraphrase-albert-small-v2")
-
-# Batch size for the transformer forward pass.
-# On a dedicated 1GB machine with no other load, 32 is safe and fast.
-ENCODE_BATCH_SIZE = int(os.getenv("ENCODE_BATCH_SIZE", "32"))
+# We use BGE-Small (384 dims) because it is highly optimized for CPU.
+# FastEmbed handles the "DEVICE" and "CPU threads" internally very efficiently.
+MODEL_NAME = os.getenv("MODEL_NAME", "BAAI/bge-small-en-v1.5")
 
 model = None
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global model
-    print(f"[INFO] Loading model: {MODEL_NAME}")
-    model = SentenceTransformer(MODEL_NAME, device=DEVICE)
+    print(f"[INFO] Loading FastEmbed model: {MODEL_NAME}")
+    # This library uses ONNX Runtime under the hood (No PyTorch!)
+    model = TextEmbedding(model_name=MODEL_NAME)
     print("[INFO] Model ready.")
     yield
     print("[INFO] Shutting down.")
 
-
-app = FastAPI(lifespan=lifespan, title="Embedding Service")
+app = FastAPI(lifespan=lifespan, title="Fast Embedding Service")
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,36 +34,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 class EmbedRequest(BaseModel):
     texts: list[str]
-
 
 class EmbedResponse(BaseModel):
     embeddings: list[list[float]]
     count: int
-
 
 @app.post("/embed", response_model=EmbedResponse)
 def embed(request: EmbedRequest):
     if not request.texts:
         return EmbedResponse(embeddings=[], count=0)
 
-    embeddings = model.encode(
-        request.texts,
-        batch_size=ENCODE_BATCH_SIZE,
-        convert_to_numpy=True,
-        show_progress_bar=False,
-        normalize_embeddings=False,
-    )
+    # FastEmbed's .embed returns an iterator of numpy arrays
+    # It is optimized for CPU batching internally.
+    embeddings_iter = model.embed(request.texts)
+    embeddings_list = [e.tolist() for e in embeddings_iter]
 
     print(f"[INFO] Processed {len(request.texts)} texts into embeddings.")
 
     return EmbedResponse(
-        embeddings=embeddings.tolist(),
-        count=len(embeddings),
+        embeddings=embeddings_list,
+        count=len(embeddings_list),
     )
-
 
 @app.get("/health")
 def health():
